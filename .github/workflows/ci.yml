@@ -14,10 +14,11 @@ on:
         options: [all, ui, api, integration, smoke]
 
 env:
-  BASE_URL:           https://www.saucedemo.com
-  API_BASE_URL:       https://reqres.in/api
-  STANDARD_USER:      standard_user
-  STANDARD_PASSWORD:  secret_sauce
+  BASE_URL:          https://www.saucedemo.com
+  API_BASE_URL:      https://reqres.in/api
+  STANDARD_USER:     standard_user
+  STANDARD_PASSWORD: secret_sauce
+  REQRES_API_KEY:    ${{ secrets.REQRES_API_KEY }}
 
 jobs:
   test:
@@ -32,10 +33,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium firefox webkit
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
       - name: Run tests
         run: |
           CMD="npx playwright test --shard=${{ matrix.shard }}/${{ matrix.total }}"
@@ -46,13 +55,17 @@ jobs:
             integration) CMD="$CMD tests/integration" ;;
           esac
           eval $CMD
-        env: { CI: true }
-      - uses: actions/upload-artifact@v4
+        env:
+          CI: true
+
+      - name: Upload blob report
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: blob-report-${{ matrix.shard }}
           path: blob-report/
           retention-days: 7
+          if-no-files-found: ignore
 
   merge-reports:
     name: Merge Reports
@@ -61,14 +74,30 @@ jobs:
     if: always()
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
-      - run: npm ci
-      - uses: actions/download-artifact@v4
-        with: { path: all-blob-reports, pattern: blob-report-*, merge-multiple: true }
-      - run: npx playwright merge-reports --reporter html ./all-blob-reports
-      - uses: actions/upload-artifact@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download blob reports
+        uses: actions/download-artifact@v4
+        with:
+          path: all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+
+      - name: Merge reports
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
+        continue-on-error: true
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report-${{ github.run_number }}
           path: playwright-report/
           retention-days: 30
+          if-no-files-found: ignore
