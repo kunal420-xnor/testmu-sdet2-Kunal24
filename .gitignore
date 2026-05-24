@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+reports/html/
+reports/test-results/
+reports/junit/
+auth-state/
+*.log
+.DS_Store
