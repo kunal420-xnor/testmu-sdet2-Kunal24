@@ -1,0 +1,12 @@
+{
+  "validUsers": [
+    { "username": "standard_user",          "password": "secret_sauce", "description": "Standard user" },
+    { "username": "performance_glitch_user", "password": "secret_sauce", "description": "Performance glitch user" }
+  ],
+  "invalidUsers": [
+    { "username": "locked_out_user",  "password": "secret_sauce", "expectedError": "Sorry, this user has been locked out" },
+    { "username": "invalid_user",     "password": "wrong_pass",   "expectedError": "Username and password do not match" },
+    { "username": "",                 "password": "",             "expectedError": "Username is required" },
+    { "username": "standard_user",   "password": "",             "expectedError": "Password is required" }
+  ]
+}
