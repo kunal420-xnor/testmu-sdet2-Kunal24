@@ -1,0 +1,74 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test type'
+        default: 'all'
+        type: choice
+        options: [all, ui, api, integration, smoke]
+
+env:
+  BASE_URL:           https://www.saucedemo.com
+  API_BASE_URL:       https://reqres.in/api
+  STANDARD_USER:      standard_user
+  STANDARD_PASSWORD:  secret_sauce
+
+jobs:
+  test:
+    name: Tests (Shard ${{ matrix.shard }}/${{ matrix.total }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+        total: [2]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Run tests
+        run: |
+          CMD="npx playwright test --shard=${{ matrix.shard }}/${{ matrix.total }}"
+          case "${{ github.event.inputs.test_type }}" in
+            smoke)       CMD="$CMD --grep @smoke" ;;
+            ui)          CMD="$CMD tests/ui" ;;
+            api)         CMD="$CMD tests/api" ;;
+            integration) CMD="$CMD tests/integration" ;;
+          esac
+          eval $CMD
+        env: { CI: true }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 7
+
+  merge-reports:
+    name: Merge Reports
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with: { path: all-blob-reports, pattern: blob-report-*, merge-multiple: true }
+      - run: npx playwright merge-reports --reporter html ./all-blob-reports
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 30
